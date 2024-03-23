@@ -1,4 +1,4 @@
-import { RedisClientType } from "redis";
+import { RedisClientType, SetOptions } from "redis";
 import redis from "../redis";
 
 export class CacheService {
@@ -19,7 +19,7 @@ export class CacheService {
     return this.parse(strValue);
   }
 
-  public async set(key: string, value: any, options?: any) {
+  public async set(key: string, value: any, options?: SetOptions) {
     return await this.redis.set(key, this.stringify(value), options);
   }
 }

@@ -28,8 +28,8 @@ export const parseTimeSpanToMilliseconds = (timeSpan: string): number => {
   return value * multiplier;
 };
 
-export const ACCESS_TOKEN_EXPIRATION_TIME = "10s"; // "1d" || "15m";
-export const REFRESH_TOKEN_EXPIRATION_TIME = "60s";
+export const ACCESS_TOKEN_EXPIRATION_TIME = "1d"; // "1d" || "15m";
+export const REFRESH_TOKEN_EXPIRATION_TIME = "7d";
 
 export const ACCESS_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
   ACCESS_TOKEN_EXPIRATION_TIME

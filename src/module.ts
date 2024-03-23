@@ -11,7 +11,6 @@ import redis from "./redis";
 import { createServer } from "http";
 import socketioServer from "./socketio";
 import { CORS_ORIGINS } from "./constants";
-import roomService from "./routes/game/room.service";
 export class AppModule {
   public hostname: string;
   public domain: string;
@@ -93,7 +92,7 @@ export class AppModule {
     this.httpServer.listen(this.port, () => {
       // initialize socket.io
 
-      roomService.init();
+      // roomService.init();
 
       console.log(`Listening on port ${this.port}`);
     });

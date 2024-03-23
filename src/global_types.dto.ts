@@ -33,7 +33,7 @@ export const zodNumericString = z.string().refine(
 declare global {
   var io: null;
   interface JWT_PAYLOAD {
-    id: tID;
+    id: string;
     username: string;
     role: Role;
   }
@@ -68,13 +68,16 @@ declare global {
     }
   }
   interface Req extends Request {
-    currentUser?: any;
+    currentUser?: JWT_PAYLOAD;
     pagination?: I_Pagination;
     accessToken?: string;
     refreshToken?: string;
   }
   interface Sock extends Socket {
     currentUser?: JWT_PAYLOAD;
+  }
+  interface SockVerified extends Socket {
+    currentUser: JWT_PAYLOAD;
   }
   type T_HTTP_SERVER = Server<typeof IncomingMessage, typeof ServerResponse>;
 }

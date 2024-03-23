@@ -1,4 +1,4 @@
 export interface UserSessionDto {
-  username: string;
+  userId: string;
   socketId: string;
 }

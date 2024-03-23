@@ -22,7 +22,7 @@ const handleTokensVerification = async ({
 }): Promise<{
   success: boolean;
   auth: boolean;
-  currentUser?: any;
+  currentUser?: JWT_PAYLOAD;
   accessToken?: string;
   refreshToken?: string;
   error?: any;
@@ -36,9 +36,10 @@ const handleTokensVerification = async ({
   }
 
   try {
-    let success: boolean = false,
+    let success: boolean = true,
       payload: any = null,
       message: string = "";
+
     // const accessToken = req.headers.authorization.split(" ")[1];
     if (accessToken) {
       let result = authenticationService.verifyAccessToken(accessToken);
@@ -63,7 +64,7 @@ const handleTokensVerification = async ({
         return {
           success: true,
           auth: true,
-          currentUser: user,
+          currentUser: user as JWT_PAYLOAD,
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           newTokens: true,
@@ -188,11 +189,12 @@ export const analyzeCurrentUser = async (
 
   socket.currentUser = result.currentUser;
   const currentUser = result.currentUser;
+  console.log("currentUser", currentUser);
 
   // save session to redis
-  if (currentUser.username) {
+  if (currentUser.id) {
     const result = await sessionService.addUserSession({
-      username: currentUser.username,
+      userId: currentUser.id,
       socketId: socket.id,
     });
     // check if session was added successfully

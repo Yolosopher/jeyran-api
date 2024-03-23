@@ -4,16 +4,16 @@ import { UserSessionDto } from "./types.dto";
 export class SessionService {
   constructor() {}
 
-  private sessionKey(username: string) {
-    return `${username}:sessions`;
+  private sessionKey(userId: string) {
+    return `${userId}:sessions`;
   }
 
   public async addUserSession({
-    username,
+    userId,
     socketId,
   }: UserSessionDto): Promise<boolean> {
     try {
-      const key = this.sessionKey(username);
+      const key = this.sessionKey(userId);
 
       // add session to user's sessions
       await redis.SADD(key, socketId);
@@ -24,23 +24,23 @@ export class SessionService {
   }
 
   public async popUserSession({
-    username,
+    userId,
     socketId,
   }: UserSessionDto): Promise<boolean> {
     try {
-      const key = this.sessionKey(username);
+      const key = this.sessionKey(userId);
 
       // remove session from user's sessions
-      await redis.SREM(key, socketId);
+      console.log(await redis.SREM(key, socketId));
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  public async getUserSessions(username: string): Promise<string[] | null> {
+  public async getUserSessions(userId: string): Promise<string[] | null> {
     try {
-      const key = this.sessionKey(username);
+      const key = this.sessionKey(userId);
       const sessions = await redis.SMEMBERS(key);
       return sessions;
     } catch (error) {

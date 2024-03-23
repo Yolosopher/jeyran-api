@@ -1,12 +1,18 @@
 import { Server } from "socket.io";
-import { onDisconnect } from "./on-disconnect";
 import {
-  onRoomCreate,
-  onRoomJoin,
-  onRoomLeave,
-  onPauseGame,
-  onStartGame,
-  onGameCheck,
+  onAskGameInfo,
+  onDisconnect,
+  onEndGame,
+  onGameCreate,
+  onGameJoin,
+  onGameLeave,
+  onGameStart,
+  // onRoomCreate,
+  // onRoomJoin,
+  // onRoomLeave,
+  // onPauseGame,
+  // onStartGame,
+  // onGameCheck,
   onPing,
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
@@ -17,8 +23,8 @@ const listenToAllOtherEvents = (socket: Sock) => {
     async ({ data, accessToken }: any, callback?: (_: any) => void) => {
       // const savedFn = async () => await fn(socket, data);
       try {
+        await analyzeCurrentUser(socket, accessToken);
         if (authRequired) {
-          await analyzeCurrentUser(socket, accessToken);
           await useSocketAuth(socket);
         }
         await fn(socket, data);
@@ -26,31 +32,33 @@ const listenToAllOtherEvents = (socket: Sock) => {
         if (callback) callback({ success: true });
       } catch (error: any) {
         console.log("caught error", error.message);
+        let response: any = { success: false };
         if (error.message === "token-refresh-required") {
-          if (callback)
-            callback({ success: false, tokenRefreshRequired: true });
-        } else if (error.message === "Not authorized") {
-          socket.emit("error", { message: error.message });
-          socket.disconnect();
+          response.tokenRefreshRequired = true;
         } else {
-          if (callback) callback({ success: false, errorMsg: error.message });
-          socket.emit("error", { message: error.message });
+          response.message = error.message;
+        }
+        if (callback) {
+          callback(response);
+        } else {
+          socket.emit("error", response);
         }
       }
     };
 
   // analyzeCurrentUser(socket);
   // useSocketAuth(socket);
+  socket.on("disconnect", asyncWrapper(onDisconnect));
   socket.on("ping", asyncWrapper(onPing));
-  socket.on("room-create", asyncWrapper(onRoomCreate));
-  socket.on("room-join", asyncWrapper(onRoomJoin));
-  socket.on("room-leave", asyncWrapper(onRoomLeave));
+  socket.on("game-create", asyncWrapper(onGameCreate));
+  socket.on("game-join", asyncWrapper(onGameJoin));
+  socket.on("game-leave", asyncWrapper(onGameLeave));
+  socket.on("game-start", asyncWrapper(onGameStart));
+  // socket.on("game-ask-info", asyncWrapper(onAskGameInfo));
+  socket.on("game-end", asyncWrapper(onEndGame));
 
-  socket.on("game-start", asyncWrapper(onStartGame));
-  socket.on("game-pause", asyncWrapper(onPauseGame));
-  socket.on("game-check", asyncWrapper(onGameCheck));
-
-  socket.on("disconnect", asyncWrapper(onDisconnect, false));
+  // socket.on("game-pause", asyncWrapper(onPauseGame));
+  // socket.on("game-check", asyncWrapper(onGameCheck));
 };
 
 export const onConnect = async (socketioServer: Server, socket: Sock) => {

@@ -23,14 +23,3 @@ export const requireSuperAdmin = (
   }
   next();
 };
-
-export const requireVerifiedUser = (
-  req: Req,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.currentUser || !req.session?.jwt || !req.currentUser.isVerified) {
-    throw new NotAuthorizedError("Please verify your email address first.");
-  }
-  next();
-};

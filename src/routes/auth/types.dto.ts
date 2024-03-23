@@ -33,3 +33,8 @@ export interface LoginDTO {
   username: string;
   password: string;
 }
+
+export type UserPopulatedType = {
+  id: string;
+  username: string;
+};

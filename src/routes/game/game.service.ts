@@ -1,255 +1,323 @@
-import { UID } from "../../utils";
-import {
-  GameInfoReturn,
-  GameState,
-  HistoryInfo,
-  HistoryType,
-  MoveType,
-  PlayerInfo,
-} from "./game.types";
+import { BadRequestError } from "../../errors/bad-request-error";
+import { NotAuthorizedError } from "../../errors/not-authorized-error";
+import redis from "../../redis";
+import sessionService from "../../services/session.service";
+import socketioServer from "../../socketio";
+import { IUser } from "../auth/types.dto";
+import Game from "./game.model";
+import { GameModel, GameState, IGame, IGamePopulated } from "./types.dto";
 
-interface Payload {
-  creator: string;
-  state?: GameState;
-  players?: PlayerInfo[];
-  history?: HistoryType;
-  gameId?: string;
-  revealed?: boolean;
-}
+class GameService {
+  constructor(private gameModel: GameModel) {}
+  public async getPingInfo(socket: SockVerified): Promise<void> {
+    const userId = socket.currentUser.id;
+    const currentGameId = await this.getCurrentGameOfTheUser(userId);
+    await this.sendCurrentGameIdToUser(userId);
 
-export class Game {
-  public gameId: string;
-  public creator: string;
-  public state: GameState;
-  public players: PlayerInfo[];
-  public history: HistoryType;
-  public revealed: boolean = false;
-  constructor({ creator, gameId, history, players, revealed, state }: Payload) {
-    this.creator = creator;
+    if (!currentGameId) {
+      return;
+    }
 
-    this.gameId = gameId || UID(3);
-    this.state = state || "lobby";
-    this.players = players || [
-      {
-        username: creator,
-        move: "none",
-        score: 0,
-      },
-    ];
-    this.history = history || {
-      gameId: this.gameId,
-      info: [],
-    };
-    this.revealed = revealed || false;
-  }
-  private getMoveType(move: string) {
-    switch (move) {
-      case "rock":
-        return "rock";
-      case "paper":
-        return "paper";
-      case "scissors":
-        return "scissors";
-      default:
-        return "rock";
+    const game = await this.getGameById(currentGameId);
+    if (!game) {
+      throw new Error("Your Current Game not found");
     }
+
+    await this.sendGameInfoToSocket(socket, game);
   }
-  private checkIfAllPlayersRolled() {
-    return this.players.every((p) => p.move !== "none");
-  }
-  private checkIfPlayerRolled(username: string) {
-    const player = this.players.find((p) => p.username === username);
-    if (!player) {
-      throw new Error("Player not found");
+
+  public async setGameToFinished(
+    userId: string,
+    gameId: string
+  ): Promise<true> {
+    // check if the game exists
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      throw new BadRequestError("Game not found");
     }
-    // return player.move !== "none";
-    if (player.move !== "none") {
-      return player;
-    } else {
-      throw new Error("Player already rolled");
+
+    // check if user is the creator
+    if (game.creator.id !== userId) {
+      throw new NotAuthorizedError("Only creator can end the game");
     }
-  }
-  private nulifyMoves() {
-    for (let i = 0; i < this.players.length; i++) {
-      this.players[i].move = "none";
-    }
-  }
-  private saveTieInHistory() {
-    this.history.info.push({
-      plays: this.players.map(({ move, username }) => {
-        return { username, move: move as MoveType };
-      }),
-      result: "tie",
-    });
-  }
-  private saveWinnerInHistory(winner: string[], loser: string[]) {
-    this.history.info.push({
-      plays: this.players.map(({ move, username }) => {
-        return { username, move: move as MoveType };
-      }),
-      result: {
-        winner,
-        loser,
+
+    // set game to finished and clear current round
+    await game.updateOne({
+      $set: {
+        state: GameState.FINISHED,
       },
     });
-    for (let i = 0; i < this.players.length; i++) {
-      if (winner.includes(this.players[i].username)) {
-        this.players[i].score += 1;
+
+    //  send users a message that the game has ended
+    await this.sendGameInfoToCurrentPlayers(game.gameId);
+
+    await game.updateOne({
+      $set: {
+        currentRound: [],
+      },
+    });
+
+    // clear current game of all players
+    for (const player of game.players) {
+      await this.delCurrentGameOfUser(player.player.id);
+    }
+
+    return true;
+  }
+
+  public async createGame(creator: string): Promise<IGamePopulated> {
+    // check if user is already in a game
+    const currentGame = await this.getCurrentGameOfTheUser(creator);
+    if (currentGame) {
+      throw new BadRequestError("User is already in a game");
+    }
+
+    const game = await this.gameModel.create({ creator });
+    // update user's current game
+    await this.setCurrentGameOfUser(game.gameId, creator);
+
+    return (await this.getGameById(game.gameId))!;
+  }
+
+  public async joinGame(
+    gameId: string,
+    userId: string
+  ): Promise<IGamePopulated> {
+    // check if user is already in a game
+    const currentGame = await this.getCurrentGameOfTheUser(userId);
+    if (currentGame) {
+      throw new BadRequestError("User is already in a game");
+    }
+
+    const game = await this.gameModel.findOne({ gameId });
+    if (!game) {
+      throw new BadRequestError("Game not found");
+    }
+
+    await game.updateOne({
+      $push: { players: { player: userId } },
+    });
+
+    // update user's current game
+    await this.setCurrentGameOfUser(gameId, userId);
+
+    return (await this.getGameById(gameId))!;
+  }
+
+  public async leaveGame(userId: string): Promise<true> {
+    // check if user is in that game
+    const currentGameId = await this.getCurrentGameOfTheUser(userId);
+    if (!currentGameId) {
+      throw new BadRequestError("User is not in a game at all");
+    }
+
+    // check if game exists
+    const game = await this.getGameById(currentGameId);
+    if (!game) {
+      throw new BadRequestError("Game doesn't exist");
+    }
+
+    // remove player from current round
+    await game.updateOne({
+      $pull: { currentRound: { player: userId } },
+    });
+
+    await this.delCurrentGameOfUser(userId);
+
+    return true;
+  }
+
+  public async getGameById(gameId: string): Promise<IGamePopulated | null> {
+    return this.gameModel.findOne({
+      gameId,
+    });
+  }
+
+  public async askSelfGameInfo(socket: SockVerified): Promise<void> {
+    const userId = socket.currentUser.id;
+    const currentGameId = await this.getCurrentGameOfTheUser(userId);
+    if (!currentGameId) {
+      await this.sendGameInfoToSocket(socket, null);
+    } else {
+      const game = await this.getGameById(currentGameId);
+      if (!game) {
+        throw new BadRequestError("Game not found");
       }
+      await this.sendGameInfoToSocket(socket, game);
     }
   }
-  private getResultInMoreThanTwoPlayers() {
-    const movesPlayed = new Set();
-    for (let i = 0; i < this.players.length; i++) {
-      movesPlayed.add(this.players[i].move);
+
+  public async askGameInfoByGameId(
+    socket: SockVerified,
+    gameId: string
+  ): Promise<void> {
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      throw new BadRequestError("Game not found");
     }
-    if (movesPlayed.size === 3) {
-      return "tie";
-    } else {
-      const result: {
-        winner: string[];
-        loser: string[];
-      } = { winner: [], loser: [] };
-      // check if scissors & rock were played
-      if (movesPlayed.has("scissors") && movesPlayed.has("rock")) {
-        for (const player of this.players) {
-          const { move, username } = player;
-          if (move === "rock") {
-            result.winner.push(username);
-          } else {
-            result.loser.push(username);
+    await this.sendNonSelfGameInfoToSocket(socket, game);
+  }
+
+  public async sendNonSelfGameInfoToSocket(
+    socket: Sock,
+    gameInfo: IGamePopulated | null
+  ): Promise<void> {
+    socket.emit("game-info-not-self", gameInfo);
+  }
+
+  public async sendGameInfoToSocket(
+    socket: Sock,
+    gameInfo: IGamePopulated | null
+  ): Promise<void> {
+    console.log("sending game info to socket");
+    // console.log(gameInfo?.toJSON());
+    socket.emit("game-info", gameInfo?.toJSON());
+  }
+
+  // send game info to all players who's current game is this game
+  public async sendGameInfoToCurrentPlayers(
+    gameOrId: string | IGamePopulated
+  ): Promise<true> {
+    const game =
+      typeof gameOrId === "string"
+        ? await this.getGameById(gameOrId)
+        : gameOrId;
+
+    if (!game) {
+      throw new BadRequestError("Game not found");
+    }
+
+    // check players who are in this game
+    const players = game.players.map((player) => player.player.id as string);
+    for (const playerId of players) {
+      const currentGame = await this.getCurrentGameOfTheUser(playerId);
+      if (currentGame === game.gameId) {
+        // get user sessions
+        const sessions = await sessionService.getUserSessions(playerId);
+        if (sessions) {
+          for (const sessionId of sessions) {
+            // send game info to player
+            console.log("sending game info to player");
+            socketioServer.to(sessionId).emit("game-info", game);
           }
         }
-        return result;
-      }
-      // check if rock & paper were played
-      if (movesPlayed.has("rock") && movesPlayed.has("paper")) {
-        for (const player of this.players) {
-          const { move, username } = player;
-          if (move === "paper") {
-            result.winner.push(username);
-          } else {
-            result.loser.push(username);
-          }
-        }
-        return result;
-      }
-      // check if paper & scissors were played
-      if (movesPlayed.has("paper") && movesPlayed.has("scissors")) {
-        for (const player of this.players) {
-          const { move, username } = player;
-          if (move === "scissors") {
-            result.winner.push(username);
-          } else {
-            result.loser.push(username);
-          }
-        }
-        return result;
       }
     }
 
-    return "tie";
-    //
-  }
-  private changeToLobby() {
-    this.state = "lobby";
-  }
-  private calculateScores() {
-    const result = this.getResultInMoreThanTwoPlayers();
-    if (result === "tie") {
-      this.saveTieInHistory();
-      this.nulifyMoves();
-    } else {
-      const { winner, loser } = result;
-      this.saveWinnerInHistory(winner, loser);
-      this.nulifyMoves();
-    }
+    return true;
   }
 
-  public get gameInfoReal() {
-    return {
-      gameId: this.gameId,
-      creator: this.creator,
-      state: this.state,
-      players: this.players,
-      history: this.history,
-    };
+  private currentGameKey(userId: string): string {
+    return `${userId}:currentGame`;
   }
 
-  public get gameInfo() {
-    const info: GameInfoReturn = this.revealed
-      ? {
-          gameId: this.gameId,
-          creator: this.creator,
-          state: this.state,
-          players: this.players.map((p) => {
-            return {
-              username: p.username,
-              score: p.score,
-              move: "hidden",
-            };
-          }),
-          history: this.history,
-        }
-      : {
-          gameId: this.gameId,
-          creator: this.creator,
-          state: this.state,
-          players: this.players,
-          history: this.history,
-        };
+  private async sendCurrentGameIdToUser(userId: string): Promise<true> {
+    const currentGameId = await this.getCurrentGameOfTheUser(userId);
 
-    return info;
-  }
-
-  public addPlayer(username: string) {
-    this.players.push({ username, move: "none", score: 0 });
-  }
-
-  public removePlayer(username: string) {
-    const playerIndex = this.players.findIndex((p) => p.username === username);
-    if (playerIndex === -1) {
-      throw new Error("Player not found");
-    }
-    if (this.players.length === 2) {
-      this.changeToLobby();
+    // get user sessions
+    const sessions = await sessionService.getUserSessions(userId);
+    if (sessions) {
+      for (const sessionId of sessions) {
+        // send game info to player
+        socketioServer.to(sessionId).emit("current-game", currentGameId);
+      }
     }
 
-    this.players.splice(playerIndex, 1);
+    return true;
+  }
+  private async setCurrentGameOfUser(
+    gameId: string,
+    userId: string
+  ): Promise<true> {
+    const key = this.currentGameKey(userId);
+    await redis.set(key, gameId);
+    await this.sendCurrentGameIdToUser(userId);
+    return true;
+  }
+  private async delCurrentGameOfUser(userId: string): Promise<true> {
+    const key = this.currentGameKey(userId);
+    await redis.del(key);
+    await this.sendCurrentGameIdToUser(userId);
+    return true;
+  }
+  private async verifyCurrentGameOfUser(
+    gameId: string,
+    userId: string
+  ): Promise<boolean> {
+    const currentGame = await this.getCurrentGameOfTheUser(userId);
+    if (currentGame !== gameId) {
+      return false;
+    }
+    return true;
+  }
+  private async getCurrentGameOfTheUser(
+    userId: string
+  ): Promise<string | null> {
+    const key = this.currentGameKey(userId);
+    return await redis.get(key);
   }
 
-  public pauseGame(initiator: string) {
-    if (initiator !== this.creator) {
-      throw new Error("Only the creator can pause the game");
-    }
-    this.state = "lobby";
-  }
-
-  public startGame(initiator: string) {
-    if (initiator !== this.creator) {
-      throw new Error("Only the creator can start the game");
-    }
-    if (this.players.length < 2) {
-      throw new Error("At least 2 players are required to start the game");
-    }
-    this.state = "in-progress";
-  }
-
-  public action(initiator: string, move: "rock" | "paper" | "scissors") {
-    if (this.state !== "in-progress") {
-      throw new Error("Game is not in progress");
+  // gameplay
+  public async startGame(socket: SockVerified): Promise<IGamePopulated> {
+    const userId = socket.currentUser.id;
+    const currentGameId = await this.getCurrentGameOfTheUser(userId);
+    if (!currentGameId) {
+      throw new BadRequestError("User is not in a game");
     }
 
-    // checks if the player has already rolled and returns player info
-    const player = this.checkIfPlayerRolled(initiator);
-    player.move = this.getMoveType(move);
-
-    const allRolled = this.checkIfAllPlayersRolled();
-    if (allRolled) {
-      this.calculateScores();
-      this.revealed = true;
-    } else {
-      this.revealed = false;
+    const game = await this.getGameById(currentGameId);
+    if (!game) {
+      throw new BadRequestError("Game not found");
     }
+
+    // check if user is the creator
+    if (game.creator.id !== userId) {
+      throw new NotAuthorizedError("Only creator can start the game");
+    }
+
+    // check if game is already started
+    if (game.state === GameState.IN_PROGRESS) {
+      throw new BadRequestError("Game is already started");
+    }
+
+    // check if game has enough players
+    if (game.players.length < 2) {
+      throw new BadRequestError("Game needs at least 2 players");
+    }
+
+    // check if game has enough players which has current game set to this game
+    let playersInGame = 0;
+    for (const player of game.players) {
+      const checkIfCurrentGame = await this.getCurrentGameOfTheUser(
+        player.player.id
+      );
+
+      if (checkIfCurrentGame === game.gameId) {
+        playersInGame++;
+      }
+    }
+    if (playersInGame < 2) {
+      throw new BadRequestError("Game needs at least 2 players");
+    }
+
+    // start the game
+    await game.updateOne({
+      $set: {
+        state: GameState.IN_PROGRESS,
+      },
+      $push: {
+        currentRound: {
+          $each: game.players.map((player) => ({
+            player: player.player.id,
+            move: "none",
+          })),
+        },
+      },
+    });
+
+    return (await this.getGameById(game.gameId))!;
   }
 }
+
+const gameService = new GameService(Game);
+export default gameService;
