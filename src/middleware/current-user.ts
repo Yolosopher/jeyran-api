@@ -204,8 +204,6 @@ export const analyzeCurrentUser = async (
       console.log(socket.id + " connected");
     }
   }
-
-  return false;
 };
 
 export const useSocketAuth = async (socket: Sock) => {

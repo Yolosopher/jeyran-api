@@ -52,6 +52,7 @@ export const onPing = async (socket: SockVerified) => {
 export const onDisconnect = async (socket: Sock) => {
   // if current user is not set, then no need to pop session
   const userId = socket?.currentUser?.id;
+  console.log("disconnecting", userId);
 
   if (userId) {
     await gameService.leaveGame(userId);

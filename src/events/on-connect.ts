@@ -16,16 +16,32 @@ import {
   onPing,
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
+import { NotAuthorizedError } from "../errors/not-authorized-error";
 
 const listenToAllOtherEvents = (socket: Sock) => {
   const asyncWrapper =
     (fn: (...args: any) => Promise<void>, authRequired: boolean = true) =>
-    async ({ data, accessToken }: any, callback?: (_: any) => void) => {
+    async (params: any, callback?: (_: any) => void) => {
       // const savedFn = async () => await fn(socket, data);
+      let parameters: any = null;
+      if (typeof params === "string") {
+        try {
+          parameters = JSON.parse(params);
+        } catch (error: any) {
+          parameters = { data: null, accessToken: null };
+        }
+      } else {
+        parameters = params;
+      }
+      const { data, accessToken } = parameters;
       try {
         await analyzeCurrentUser(socket, accessToken);
         if (authRequired) {
-          await useSocketAuth(socket);
+          if (!socket.currentUser) {
+            throw new NotAuthorizedError("Not authorized");
+          } else {
+            await useSocketAuth(socket);
+          }
         }
         await fn(socket, data);
 
@@ -48,7 +64,6 @@ const listenToAllOtherEvents = (socket: Sock) => {
 
   // analyzeCurrentUser(socket);
   // useSocketAuth(socket);
-  socket.on("disconnect", asyncWrapper(onDisconnect));
   socket.on("ping", asyncWrapper(onPing));
   socket.on("game-create", asyncWrapper(onGameCreate));
   socket.on("game-join", asyncWrapper(onGameJoin));
@@ -57,6 +72,7 @@ const listenToAllOtherEvents = (socket: Sock) => {
   // socket.on("game-ask-info", asyncWrapper(onAskGameInfo));
   socket.on("game-end", asyncWrapper(onEndGame));
 
+  socket.on("disconnect", asyncWrapper(onDisconnect));
   // socket.on("game-pause", asyncWrapper(onPauseGame));
   // socket.on("game-check", asyncWrapper(onGameCheck));
 };
