@@ -22,7 +22,7 @@ const GameSchema = new Schema<IGame>(
         GameState.LOBBY,
         GameState.IN_PROGRESS,
         GameState.FINISHED,
-        GameState.PAUSED,
+        GameState.STOPPED,
       ],
       default: GameState.LOBBY,
     },
@@ -51,7 +51,7 @@ const GameSchema = new Schema<IGame>(
         },
       },
     ],
-    history_rounds: [
+    historyRounds: [
       {
         winners: [
           {
@@ -59,7 +59,7 @@ const GameSchema = new Schema<IGame>(
             ref: "User",
           },
         ],
-        player_moves: [
+        playerMoves: [
           {
             player: {
               type: Schema.Types.ObjectId,
@@ -76,6 +76,11 @@ const GameSchema = new Schema<IGame>(
     revealed: {
       type: Boolean,
       default: false,
+    },
+    inGamePlayers: {
+      type: [Schema.Types.ObjectId],
+      ref: "User",
+      default: [],
     },
   },
   {
@@ -134,8 +139,8 @@ GameSchema.pre("findOne", { document: true, query: true }, function (done) {
   this.populate("creator", "id username");
   this.populate("players.player", "id username");
   this.populate("currentRound.player", "id username");
-  this.populate("history_rounds.winners", "id username");
-  this.populate("history_rounds.player_moves.player", "id username");
+  this.populate("historyRounds.winners", "id username");
+  this.populate("historyRounds.playerMoves.player", "id username");
   done();
 });
 

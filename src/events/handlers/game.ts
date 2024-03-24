@@ -16,7 +16,8 @@ export const onGameJoin = async (socket: SockVerified, gameId: string) => {
 
 export const onGameLeave = async (socket: SockVerified) => {
   const userId = socket.currentUser.id;
-  await gameService.leaveGame(userId);
+  const game = await gameService.leaveGame(userId);
+  await gameService.sendGameInfoToCurrentPlayers(game);
 };
 
 export const onGameStart = async (socket: SockVerified) => {
@@ -24,50 +25,39 @@ export const onGameStart = async (socket: SockVerified) => {
   await gameService.sendGameInfoToCurrentPlayers(game);
 };
 
-export const onEndGame = async (socket: SockVerified, gameId: string) => {
+export const onEndGame = async (socket: SockVerified) => {
   const userId = socket.currentUser.id;
-  await gameService.setGameToFinished(userId, gameId);
+  await gameService.setGameToFinished(socket);
 };
 
-// export const onPauseGame = async (socket: Sock, roomId: string) => {
-//   roomService.pauseGame(roomId, socket);
-// };
+export const onGameStop = async (socket: SockVerified) => {
+  const game = await gameService.stopGame(socket);
+  await gameService.sendGameInfoToCurrentPlayers(game);
+};
 
 // export const onGameAction = async (socket: Sock, data: any) => {
 //   roomService.gameAction(data, socket);
 // };
 
-export const onAskGameInfo = async (socket: SockVerified, gameId?: string) => {
-  if (gameId) {
-    await gameService.askGameInfoByGameId(socket, gameId);
-  } else {
-    await gameService.askSelfGameInfo(socket);
-  }
-};
-
 export const onPing = async (socket: SockVerified) => {
-  socket.emit("pong", Date.now());
   await gameService.getPingInfo(socket);
 };
 export const onDisconnect = async (socket: Sock) => {
-  // if current user is not set, then no need to pop session
-  const userId = socket?.currentUser?.id;
-  console.log("disconnecting", userId);
-
-  if (userId) {
-    await gameService.leaveGame(userId);
-
-    // pop session from redis
-    // FIXME: popUserSession doesn't work
-    const result = await sessionService.popUserSession({
-      userId,
-      socketId: socket.id,
-    });
-    if (!result) {
-      throw new Error("Failed to pop session");
-    } else {
-      console.log(socket.id + " disconnected from redis");
+  // pop session from redis
+  const result = await sessionService.popUserSession({
+    userId: "",
+    socketId: socket.id,
+  });
+  if (!result.success) {
+    console.log("Failed to pop session, maybe not logged in socket");
+  } else {
+    console.log(socket.id + " disconnected from redis");
+    const gameId = await gameService.getCurrentGameOfTheUser(result.userId);
+    if (gameId) {
+      await gameService.removeOnlinePlayerFromGame(gameId, result.userId);
     }
+    // leave game too
+    // await gameService.leaveGame(result.userId, true);
   }
 
   console.log((await socketioServer.fetchSockets()).map((a) => a.id));

@@ -1,18 +1,12 @@
 import { Server } from "socket.io";
 import {
-  onAskGameInfo,
   onDisconnect,
   onEndGame,
   onGameCreate,
   onGameJoin,
   onGameLeave,
+  onGameStop,
   onGameStart,
-  // onRoomCreate,
-  // onRoomJoin,
-  // onRoomLeave,
-  // onPauseGame,
-  // onStartGame,
-  // onGameCheck,
   onPing,
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
@@ -35,8 +29,8 @@ const listenToAllOtherEvents = (socket: Sock) => {
       }
       const { data, accessToken } = parameters;
       try {
-        await analyzeCurrentUser(socket, accessToken);
         if (authRequired) {
+          await analyzeCurrentUser(socket, accessToken);
           if (!socket.currentUser) {
             throw new NotAuthorizedError("Not authorized");
           } else {
@@ -64,17 +58,14 @@ const listenToAllOtherEvents = (socket: Sock) => {
 
   // analyzeCurrentUser(socket);
   // useSocketAuth(socket);
+  socket.on("disconnect", asyncWrapper(onDisconnect, false));
   socket.on("ping", asyncWrapper(onPing));
   socket.on("game-create", asyncWrapper(onGameCreate));
   socket.on("game-join", asyncWrapper(onGameJoin));
   socket.on("game-leave", asyncWrapper(onGameLeave));
   socket.on("game-start", asyncWrapper(onGameStart));
-  // socket.on("game-ask-info", asyncWrapper(onAskGameInfo));
+  socket.on("game-stop", asyncWrapper(onGameStop));
   socket.on("game-end", asyncWrapper(onEndGame));
-
-  socket.on("disconnect", asyncWrapper(onDisconnect));
-  // socket.on("game-pause", asyncWrapper(onPauseGame));
-  // socket.on("game-check", asyncWrapper(onGameCheck));
 };
 
 export const onConnect = async (socketioServer: Server, socket: Sock) => {

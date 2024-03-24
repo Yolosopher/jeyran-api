@@ -5,7 +5,7 @@ export enum GameState {
   LOBBY = "lobby",
   IN_PROGRESS = "in-progress",
   FINISHED = "finished",
-  PAUSED = "paused",
+  STOPPED = "stopped",
 }
 
 export enum MoveType {
@@ -20,7 +20,7 @@ type PlayerMoveType = {
 };
 type RoundType = {
   winners: IUser[] | tID[];
-  player_moves: PlayerMoveType[];
+  playerMoves: PlayerMoveType[];
 };
 
 type PlayerMovePopulatedType = {
@@ -29,7 +29,7 @@ type PlayerMovePopulatedType = {
 };
 type RoundPopulatedType = {
   winners: UserPopulatedType[];
-  player_moves: PlayerMovePopulatedType[];
+  playerMoves: PlayerMovePopulatedType[];
 };
 
 export interface IGame extends Document {
@@ -46,7 +46,8 @@ export interface IGame extends Document {
     player: tID | IUser;
     move: MoveType | "none" | "hidden";
   }[];
-  history_rounds: RoundType[];
+  historyRounds: RoundType[];
+  inGamePlayers: tID[];
   revealed: boolean;
 }
 
@@ -64,7 +65,8 @@ export interface IGamePopulated extends Document {
     player: UserPopulatedType;
     move: MoveType | "none" | "hidden";
   }[];
-  history_rounds: RoundPopulatedType[];
+  historyRounds: RoundPopulatedType[];
+  inGamePlayers: string[];
   revealed: boolean;
 }
 

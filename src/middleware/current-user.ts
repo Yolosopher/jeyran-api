@@ -187,9 +187,8 @@ export const analyzeCurrentUser = async (
     throw new NotAuthorizedError(result.error);
   }
 
-  socket.currentUser = result.currentUser;
   const currentUser = result.currentUser;
-  console.log("currentUser", currentUser);
+  socket.currentUser = currentUser;
 
   // save session to redis
   if (currentUser.id) {

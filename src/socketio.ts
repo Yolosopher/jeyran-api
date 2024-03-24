@@ -17,8 +17,5 @@ const socketioServer = new Server({
 socketioServer.on("connection", async (socket: Sock) => {
   onConnect(socketioServer, socket);
 });
-socketioServer.on("disconnect", (socket: Socket) => {
-  console.log("disconnected", socket.id);
-});
 
 export default socketioServer;

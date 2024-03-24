@@ -1,11 +1,18 @@
 import redis from "../redis";
-import { UserSessionDto } from "./types.dto";
+import { hoursToMilliseconds } from "../utils";
+import { UserSessionDto, UserSessionPopDto } from "./types.dto";
 
 export class SessionService {
   constructor() {}
 
-  private sessionKey(userId: string) {
+  private userIdKey(userId: string) {
+    // returns socketId from db
     return `${userId}:sessions`;
+  }
+
+  private socketIdKey(socketId: string) {
+    // returns userId from db
+    return `${socketId}:userId`;
   }
 
   public async addUserSession({
@@ -13,10 +20,15 @@ export class SessionService {
     socketId,
   }: UserSessionDto): Promise<boolean> {
     try {
-      const key = this.sessionKey(userId);
+      const userIdKey = this.userIdKey(userId);
+      const socketIdKey = this.socketIdKey(socketId);
 
       // add session to user's sessions
-      await redis.SADD(key, socketId);
+      await redis.SADD(userIdKey, socketId);
+
+      // add user to session
+      await redis.set(socketIdKey, userId, { PX: hoursToMilliseconds(8 * 24) });
+
       return true;
     } catch (error) {
       return false;
@@ -26,25 +38,57 @@ export class SessionService {
   public async popUserSession({
     userId,
     socketId,
-  }: UserSessionDto): Promise<boolean> {
+  }: UserSessionPopDto): Promise<
+    { success: true; userId: string } | { success: false }
+  > {
     try {
-      const key = this.sessionKey(userId);
+      const socketIdKey = this.socketIdKey(socketId); // returns userId from db
+
+      let userIdKey = "", // returns socketId from db
+        realUserId = "";
+
+      if (userId) {
+        realUserId = userId;
+        userIdKey = this.userIdKey(userId);
+      } else {
+        const foundUserId = await redis.get(socketIdKey);
+        if (!foundUserId) {
+          throw new Error("foundUserId error....");
+        }
+
+        userIdKey = this.userIdKey(foundUserId);
+        realUserId = foundUserId;
+      }
+
+      // remove user from session
+      await redis.del(socketIdKey);
 
       // remove session from user's sessions
-      console.log(await redis.SREM(key, socketId));
-      return true;
+      await redis.SREM(userIdKey, socketId);
+
+      return { success: true, userId: realUserId };
     } catch (error) {
-      return false;
+      return { success: false };
     }
   }
 
   public async getUserSessions(userId: string): Promise<string[] | null> {
     try {
-      const key = this.sessionKey(userId);
-      const sessions = await redis.SMEMBERS(key);
+      const userIdKey = this.userIdKey(userId);
+      const sessions = await redis.SMEMBERS(userIdKey);
       return sessions;
     } catch (error) {
       return null;
+    }
+  }
+
+  public async isOnline(userId: string): Promise<boolean> {
+    try {
+      const userIdKey = this.userIdKey(userId);
+      const sessions = await redis.SMEMBERS(userIdKey);
+      return sessions.length > 0;
+    } catch (error) {
+      return false;
     }
   }
 }
