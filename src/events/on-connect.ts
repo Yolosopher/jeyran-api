@@ -8,6 +8,8 @@ import {
   onGameStop,
   onGameStart,
   onPing,
+  onGameRestart,
+  onGameMove,
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
 import { NotAuthorizedError } from "../errors/not-authorized-error";
@@ -64,8 +66,10 @@ const listenToAllOtherEvents = (socket: Sock) => {
   socket.on("game-join", asyncWrapper(onGameJoin));
   socket.on("game-leave", asyncWrapper(onGameLeave));
   socket.on("game-start", asyncWrapper(onGameStart));
+  socket.on("game-restart", asyncWrapper(onGameRestart));
   socket.on("game-stop", asyncWrapper(onGameStop));
   socket.on("game-end", asyncWrapper(onEndGame));
+  socket.on("game-move", asyncWrapper(onGameMove));
 };
 
 export const onConnect = async (socketioServer: Server, socket: Sock) => {

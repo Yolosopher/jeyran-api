@@ -11,16 +11,16 @@ services:
       - REDIS_PASSWORD=eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
       - REDIS_PORT=6379
       - REDIS_DATABASES=16
-  mongodb:
-    image: mongo:4.4.6
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb:/data/db
+  # mongodb:
+  #   image: mongo:4.4.6
+  #   restart: always
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongodb:/data/db
 
 volumes:
   cache:
     driver: local
-  mongodb:
-    driver: local
+  # mongodb:
+  #   driver: local

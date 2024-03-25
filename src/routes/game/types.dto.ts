@@ -18,7 +18,7 @@ type PlayerMoveType = {
   player: tID | IUser;
   move: MoveType;
 };
-type RoundType = {
+export type RoundType = {
   winners: IUser[] | tID[];
   playerMoves: PlayerMoveType[];
 };
@@ -32,6 +32,16 @@ type RoundPopulatedType = {
   playerMoves: PlayerMovePopulatedType[];
 };
 
+export type CurrentRoundType = {
+  player: tID | IUser;
+  move: MoveType | "none" | "hidden";
+};
+
+export type CurrentRoundPopulatedType = {
+  player: UserPopulatedType;
+  move: MoveType | "none" | "hidden";
+};
+
 export interface IGame extends Document {
   _id?: tID;
   id?: tID;
@@ -42,10 +52,7 @@ export interface IGame extends Document {
     player: tID | IUser;
     score: number;
   }[];
-  currentRound: {
-    player: tID | IUser;
-    move: MoveType | "none" | "hidden";
-  }[];
+  currentRound: CurrentRoundType[];
   historyRounds: RoundType[];
   inGamePlayers: tID[];
   revealed: boolean;
@@ -61,13 +68,15 @@ export interface IGamePopulated extends Document {
     player: UserPopulatedType;
     score: number;
   }[];
-  currentRound: {
-    player: UserPopulatedType;
-    move: MoveType | "none" | "hidden";
-  }[];
+  currentRound: CurrentRoundPopulatedType[];
   historyRounds: RoundPopulatedType[];
   inGamePlayers: string[];
   revealed: boolean;
 }
 
 export interface GameModel extends Model<IGame> {}
+
+export interface ParseGameInfoForPlayerType {
+  socketOrUserId: SockVerified | string; // socket or user id
+  game: IGamePopulated;
+}

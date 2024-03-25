@@ -5,7 +5,23 @@ import sessionService from "../../services/session.service";
 import socketioServer from "../../socketio";
 import { IUser } from "../auth/types.dto";
 import Game from "./game.model";
-import { GameModel, GameState, IGame, IGamePopulated } from "./types.dto";
+import {
+  GameModel,
+  GameState,
+  IGame,
+  IGamePopulated,
+  MoveType,
+  ParseGameInfoForPlayerType,
+  RoundType,
+} from "./types.dto";
+
+type HistoryRoundPayloadType = {
+  winners: string[];
+  playerMoves: {
+    player: string;
+    move: MoveType;
+  }[];
+};
 
 class GameService {
   constructor(private gameModel: GameModel) {}
@@ -183,14 +199,62 @@ class GameService {
   ): Promise<void> {
     socket.emit("game-info-not-self", gameInfo);
   }
+  private parseGameInfoForPlayer({
+    socketOrUserId,
+    game,
+  }: ParseGameInfoForPlayerType): IGamePopulated {
+    if (game.revealed) {
+      return game;
+    }
 
+    const userId =
+      typeof socketOrUserId === "string"
+        ? socketOrUserId
+        : socketOrUserId.currentUser.id;
+
+    // console.log(socketOrUserId)
+    console.log("userId", userId);
+    console.log(
+      "found",
+      game.currentRound.find((player) => player.player.id === userId)?.player.id
+    );
+    game = game.toJSON();
+    console.log("player", game.currentRound[0]);
+    game.currentRound = game.currentRound.map(({ move, player }) => {
+      if (player.id === userId || move === "none") {
+        return {
+          player: {
+            id: player.id.toString(),
+            username: player.username,
+          },
+          move,
+        };
+      } else {
+        return {
+          player: {
+            id: player.id.toString(),
+            username: player.username,
+          },
+          move: "hidden",
+        };
+      }
+    });
+    return game;
+  }
   public async sendGameInfoToSocket(
-    socket: Sock,
+    socket: SockVerified,
     gameInfo: IGamePopulated | null
   ): Promise<void> {
-    console.log("sending game info to socket");
     // console.log(gameInfo?.toJSON());
-    socket.emit("game-info", gameInfo?.toJSON());
+    if (!gameInfo) {
+      socket.emit("game-info", null);
+    } else {
+      const gameInfoParsed = this.parseGameInfoForPlayer({
+        socketOrUserId: socket,
+        game: gameInfo,
+      });
+      socket.emit("game-info", gameInfoParsed);
+    }
   }
 
   // send game info to all players who's current game is this game
@@ -210,13 +274,19 @@ class GameService {
     const players = game.players.map((player) => player.player.id as string);
     for (const playerId of players) {
       const currentGame = await this.getCurrentGameOfTheUser(playerId);
+
+      const gameInfoParsed = this.parseGameInfoForPlayer({
+        socketOrUserId: playerId,
+        game,
+      });
+
       if (currentGame === game.gameId) {
         // get user sessions
         const sessions = await sessionService.getUserSessions(playerId);
         if (sessions) {
           for (const sessionId of sessions) {
             // send game info to player
-            socketioServer.to(sessionId).emit("game-info", game);
+            socketioServer.to(sessionId).emit("game-info", gameInfoParsed);
           }
         }
       }
@@ -327,13 +397,8 @@ class GameService {
   }
   public async startGame(socket: SockVerified): Promise<IGamePopulated> {
     const { game } = await this.validateCreatorAndGame(socket);
-    // check if game is already started
-    if (game.state === GameState.IN_PROGRESS) {
-      throw new BadRequestError("Game is already started");
-    }
-
-    if (game.state === GameState.FINISHED) {
-      throw new BadRequestError("Game is already finished");
+    if (game.state !== GameState.LOBBY) {
+      throw new BadRequestError("Game is not in lobby");
     }
 
     // check if playable
@@ -383,7 +448,6 @@ class GameService {
 
     return (await this.getGameById(game.gameId))!;
   }
-
   public async stopGame(socket: SockVerified): Promise<IGamePopulated> {
     const { game } = await this.validateCreatorAndGame(socket);
 
@@ -406,7 +470,154 @@ class GameService {
 
     return (await this.getGameById(game.gameId))!;
   }
+  public async moveInGame(
+    socket: SockVerified,
+    move: MoveType
+  ): Promise<IGamePopulated> {
+    const userId = socket.currentUser.id;
 
+    // check if move exists
+    if (!move) {
+      throw new BadRequestError("Move is required");
+    }
+
+    // check if user is in a game
+    const gameId = await this.getCurrentGameOfTheUser(userId);
+    if (!gameId) {
+      throw new BadRequestError("User is not in a game");
+    }
+
+    // check if game exists
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      throw new BadRequestError("Game not found");
+    }
+
+    // check if game is in progress
+    if (game.state !== GameState.IN_PROGRESS) {
+      throw new BadRequestError("Game is not in progress");
+    }
+
+    // check if user is in current round
+    const isInCurrentRound = game.currentRound.find(
+      (player) => player.player.id === userId
+    );
+
+    if (!isInCurrentRound) {
+      throw new BadRequestError("It's not your turn");
+    }
+
+    // check if user has already moved
+    if (isInCurrentRound.move !== "none") {
+      throw new BadRequestError("You have already moved");
+    }
+
+    // check if valid move
+    const legalMoves = ["rock", "paper", "scissors"];
+    if (!legalMoves.includes(move)) {
+      throw new BadRequestError("Invalid move");
+    }
+
+    // update move
+    await game.updateOne(
+      {
+        $set: {
+          currentRound: game.currentRound.map((player) =>
+            player.player.id === userId ? { player: userId, move } : player
+          ),
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    return (await this.getGameById(game.gameId))!;
+  }
+  public async calculateScores(
+    game: IGamePopulated
+  ): Promise<IGamePopulated | null> {
+    // check if round is finished
+    if (!game.revealed) {
+      return null;
+    }
+
+    // moves played
+    const movesPlayed = new Set(game.currentRound.map((player) => player.move));
+
+    // check if tie
+    if (movesPlayed.size === 3) {
+      await game.updateOne({
+        $push: {
+          historyRounds: {
+            winners: [],
+            playerMoves: game.currentRound.map(({ player, move }) => ({
+              player,
+              move,
+            })),
+          },
+        },
+        $set: {
+          currentRound: game.currentRound.map((player) => ({
+            ...player,
+            move: "none",
+          })),
+        },
+      });
+    } else {
+      const payload: HistoryRoundPayloadType = {
+        winners: [],
+        playerMoves: game.currentRound.map(({ player, move }) => ({
+          player: player.id,
+          move: move as MoveType,
+        })),
+      };
+      // check if scissors & rock were played
+      if (
+        movesPlayed.has(MoveType.SCISSORS) &&
+        movesPlayed.has(MoveType.ROCK)
+      ) {
+        for (const player of game.currentRound) {
+          if (player.move === MoveType.ROCK) {
+            payload.winners.push(player.player.id);
+          }
+        }
+      } else if (
+        // check if scissors & paper were played
+        movesPlayed.has(MoveType.SCISSORS) &&
+        movesPlayed.has(MoveType.PAPER)
+      ) {
+        for (const player of game.currentRound) {
+          if (player.move === MoveType.SCISSORS) {
+            payload.winners.push(player.player.id);
+          }
+        }
+      } else if (
+        // check if rock & paper were played
+        movesPlayed.has(MoveType.ROCK) &&
+        movesPlayed.has(MoveType.PAPER)
+      ) {
+        for (const player of game.currentRound) {
+          if (player.move === MoveType.PAPER) {
+            payload.winners.push(player.player.id);
+          }
+        }
+      }
+
+      // update history rounds
+      await game.updateOne({
+        $push: { historyRounds: payload },
+        $set: {
+          currentRound: game.currentRound.map((player) => ({
+            ...player,
+            move: "none",
+          })),
+        },
+      });
+    }
+
+    return (await this.getGameById(game.gameId))!;
+  }
   // online players info
   private getOnlinePlayersKey(gameId: string): string {
     return `${gameId}:onlinePlayers`;

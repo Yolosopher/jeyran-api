@@ -35,18 +35,14 @@ const UserSchema = new Schema<IUser>(
     versionKey: false,
     toJSON: {
       transform(doc, ret) {
-        ret.id = doc._id;
+        ret.id = doc._id.toString();
         delete ret._id;
       },
     },
   }
 );
 
-UserSchema.virtual("id").get(function () {
-  return this._id.toString();
-});
-
-UserSchema.pre("save", async function (done) {
+UserSchema.pre("save", { document: true, query: true }, async function (done) {
   if (this.isModified("password") || this.isNew) {
     const hashed = authenticationService.hashPassword(this.get("password"));
     this.set("password", hashed);

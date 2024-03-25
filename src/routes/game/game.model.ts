@@ -1,5 +1,11 @@
 import { Schema, model } from "mongoose";
-import { GameModel, IGame, GameState, MoveType } from "./types.dto";
+import {
+  GameModel,
+  IGame,
+  GameState,
+  MoveType,
+  CurrentRoundType,
+} from "./types.dto";
 import { UID } from "../../utils";
 
 const GameSchema = new Schema<IGame>(
@@ -27,51 +33,67 @@ const GameSchema = new Schema<IGame>(
       default: GameState.LOBBY,
     },
     players: [
-      {
-        player: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-        },
-        score: {
-          type: Number,
-          default: 0,
-        },
-      },
-    ],
-    currentRound: [
-      {
-        player: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-        },
-        move: {
-          type: String,
-          enum: [MoveType.PAPER, MoveType.ROCK, MoveType.SCISSORS, "none"],
-          default: "none",
-        },
-      },
-    ],
-    historyRounds: [
-      {
-        winners: [
-          {
+      new Schema(
+        {
+          player: {
             type: Schema.Types.ObjectId,
             ref: "User",
           },
-        ],
-        playerMoves: [
-          {
-            player: {
+          score: {
+            type: Number,
+            default: 0,
+          },
+        },
+        {
+          _id: false,
+        }
+      ),
+    ],
+    currentRound: [
+      new Schema(
+        {
+          player: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+          move: {
+            type: String,
+            enum: [MoveType.PAPER, MoveType.ROCK, MoveType.SCISSORS, "none"],
+            default: "none",
+          },
+        },
+        {
+          _id: false,
+        }
+      ),
+    ],
+    historyRounds: [
+      new Schema(
+        {
+          winners: [
+            {
               type: Schema.Types.ObjectId,
               ref: "User",
             },
-            move: {
-              type: String,
-              enum: [MoveType.PAPER, MoveType.ROCK, MoveType.SCISSORS],
-            },
-          },
-        ],
-      },
+          ],
+          playerMoves: [
+            new Schema(
+              {
+                player: {
+                  type: Schema.Types.ObjectId,
+                  ref: "User",
+                },
+                move: {
+                  type: String,
+                  enum: [MoveType.PAPER, MoveType.ROCK, MoveType.SCISSORS],
+                },
+              },
+              { _id: false }
+            ),
+          ],
+        },
+        { _id: false }
+      ),
     ],
     revealed: {
       type: Boolean,
@@ -88,21 +110,19 @@ const GameSchema = new Schema<IGame>(
     versionKey: false,
     toJSON: {
       transform(doc, ret) {
+        ret.id = doc._id.toString();
         delete ret._id;
-        if (!doc.revealed) {
-          ret.currentRound = doc.currentRound.map((player: any) => {
-            player.move = "hidden";
-            return player;
-          });
-        }
+
+        // if (!doc.revealed) {
+        //   ret.currentRound = doc.currentRound.map((player: any) => {
+        //     player.move = "hidden";
+        //     return player;
+        //   });
+        // }
       },
     },
   }
 );
-
-GameSchema.virtual("id").get(function () {
-  return this._id.toString();
-});
 
 GameSchema.pre("save", function (done) {
   if (this.isNew) {
@@ -115,11 +135,14 @@ GameSchema.pre("save", function (done) {
 // if currentRound is updated, check if all players have made a move
 // if all players have made a move, set revealed to true
 // else set revealed to false
-GameSchema.pre("updateOne", { document: true, query: false }, function (done) {
-  if (this.isModified("currentRound")) {
+GameSchema.pre("updateOne", { document: false, query: true }, function (done) {
+  const players = this.get("currentRound");
+  if (!players) return done();
+  console.log("currentRound: ", players);
+  if (players.length > 1) {
+    console.log("currentRound is modified...");
     // check if all players have made a move
     let allPlayersMadeMove = true;
-    const players = this.get("currentRound");
     for (const player of players) {
       if (player.move === "none") {
         allPlayersMadeMove = false;
@@ -143,18 +166,6 @@ GameSchema.pre("findOne", { document: true, query: true }, function (done) {
   this.populate("historyRounds.playerMoves.player", "id username");
   done();
 });
-
-// GameSchema.post("findOne", { document: true, query: true }, function (done) {
-//   if (!this.get("revealed")) {
-//     this.transform((ret) => {
-//       ret.currentRound = ret.currentRound.map((player: any) => {
-//         player.move = "none";
-//         return player;
-//       });
-//     });
-//   }
-//   done();
-// });
 
 const Game = model<IGame, GameModel>("Game", GameSchema);
 

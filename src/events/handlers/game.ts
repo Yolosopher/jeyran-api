@@ -1,4 +1,5 @@
 import gameService from "../../routes/game/game.service";
+import { MoveType } from "../../routes/game/types.dto";
 import sessionService from "../../services/session.service";
 import socketioServer from "../../socketio";
 
@@ -25,6 +26,11 @@ export const onGameStart = async (socket: SockVerified) => {
   await gameService.sendGameInfoToCurrentPlayers(game);
 };
 
+export const onGameRestart = async (socket: SockVerified) => {
+  const game = await gameService.restartGame(socket);
+  await gameService.sendGameInfoToCurrentPlayers(game);
+};
+
 export const onEndGame = async (socket: SockVerified) => {
   const userId = socket.currentUser.id;
   await gameService.setGameToFinished(socket);
@@ -35,9 +41,16 @@ export const onGameStop = async (socket: SockVerified) => {
   await gameService.sendGameInfoToCurrentPlayers(game);
 };
 
-// export const onGameAction = async (socket: Sock, data: any) => {
-//   roomService.gameAction(data, socket);
-// };
+export const onGameMove = async (socket: SockVerified, move: MoveType) => {
+  const game = await gameService.moveInGame(socket, move);
+  await gameService.sendGameInfoToCurrentPlayers(game);
+  const updatedGame = await gameService.calculateScores(game);
+  if (updatedGame) {
+    setTimeout(async () => {
+      await gameService.sendGameInfoToCurrentPlayers(updatedGame);
+    }, 3000);
+  }
+};
 
 export const onPing = async (socket: SockVerified) => {
   await gameService.getPingInfo(socket);
