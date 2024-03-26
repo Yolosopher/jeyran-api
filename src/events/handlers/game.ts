@@ -62,7 +62,7 @@ export const onDisconnect = async (socket: Sock) => {
     socketId: socket.id,
   });
   if (!result.success) {
-    console.log("Failed to pop session, maybe not logged in socket");
+    // console.log("Failed to pop session, maybe not logged in socket");
   } else {
     console.log(socket.id + " disconnected from redis");
     const gameId = await gameService.getCurrentGameOfTheUser(result.userId);

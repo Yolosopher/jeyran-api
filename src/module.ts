@@ -8,7 +8,7 @@ import routes from "./routes";
 import { connect } from "mongoose";
 import { errorHandler, invalidRouteHandler } from "./middleware";
 import redis from "./redis";
-import { createServer } from "http";
+import { createServer } from "https";
 import socketioServer from "./socketio";
 import { CORS_ORIGINS } from "./constants";
 export class AppModule {
@@ -17,7 +17,10 @@ export class AppModule {
   public isProd: boolean;
   public port: number;
   public httpServer: T_HTTP_SERVER | null;
-  constructor(public app: Application) {
+  constructor(
+    public app: Application,
+    public certOptions: { key: string; cert: string } | undefined
+  ) {
     this.httpServer = null;
     this.port = process.env.PORT ? Number(process.env.PORT) : 6060;
     this.domain = "https://yolosopher.online";
@@ -25,7 +28,6 @@ export class AppModule {
 
     this.isProd = false;
     this.app.set("trust proxy", true);
-    this.app.use(cookieParser());
     this.app.use(
       cors({
         origin: CORS_ORIGINS,
@@ -33,6 +35,7 @@ export class AppModule {
         credentials: true,
       })
     );
+    this.app.use(cookieParser());
 
     this.app.use(urlencoded({ extended: false }));
     this.app.use(json());
@@ -82,7 +85,11 @@ export class AppModule {
       console.log(error);
     }
 
-    this.httpServer = createServer(this.app);
+    if (!this.certOptions) {
+      this.httpServer = createServer(this.app);
+    } else {
+      this.httpServer = createServer(this.certOptions, this.app);
+    }
     socketioServer.listen(this.httpServer!, {
       cors: {
         origin: CORS_ORIGINS,
@@ -94,7 +101,11 @@ export class AppModule {
 
       // roomService.init();
 
-      console.log(`Listening on port ${this.port}`);
+      console.log(
+        `Listening on port http${this.certOptions ? "s" : ""}://localhost:${
+          this.port
+        }`
+      );
     });
   }
 }

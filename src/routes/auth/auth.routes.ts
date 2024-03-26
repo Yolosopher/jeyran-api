@@ -39,13 +39,13 @@ authRoutes.post(
     res.cookie("accessToken", tokens.accessToken, {
       httpOnly: true,
       maxAge: ACCESS_TOKEN_EXPIRATION_TIME_MS,
-      sameSite: "none",
+      sameSite: "lax",
       secure: true,
     });
     res.cookie("refreshToken", tokens.refreshToken, {
       httpOnly: true,
       maxAge: REFRESH_TOKEN_EXPIRATION_TIME_MS,
-      sameSite: "none",
+      sameSite: "lax",
       secure: true,
     });
 
