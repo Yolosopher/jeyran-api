@@ -27,6 +27,7 @@ class GameService {
   constructor(private gameModel: GameModel) {}
   public async getPingInfo(socket: SockVerified): Promise<void> {
     const userId = socket.currentUser.id;
+    await this.sendCurrentGameIdToUser(userId);
     // await socket.join(userId);
 
     const currentGameId = await this.getCurrentGameOfTheUser(userId);
@@ -41,7 +42,6 @@ class GameService {
       throw new Error("Your Current Game not found");
     }
 
-    await this.sendCurrentGameIdToUser(userId);
     await this.sendGameInfoToSocket(socket, game);
 
     await this.addOnlinePlayerToGame(currentGameId, userId);
@@ -552,14 +552,14 @@ class GameService {
           historyRounds: {
             winners: [],
             playerMoves: game.currentRound.map(({ player, move }) => ({
-              player,
+              player: player.id,
               move,
             })),
           },
         },
         $set: {
-          currentRound: game.currentRound.map((player) => ({
-            ...player,
+          currentRound: game.currentRound.map(({ player, move }) => ({
+            player: player.id,
             move: "none",
           })),
         },
@@ -608,8 +608,8 @@ class GameService {
       await game.updateOne({
         $push: { historyRounds: payload },
         $set: {
-          currentRound: game.currentRound.map((player) => ({
-            ...player,
+          currentRound: game.currentRound.map(({ player }) => ({
+            player: player.id,
             move: "none",
           })),
         },

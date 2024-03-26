@@ -1,6 +1,5 @@
 import { Server } from "socket.io";
 import {
-  onDisconnect,
   onEndGame,
   onGameCreate,
   onGameJoin,
@@ -13,6 +12,7 @@ import {
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
 import { NotAuthorizedError } from "../errors/not-authorized-error";
+import { onDisconnect } from "./on-disconnect";
 
 const listenToAllOtherEvents = (socket: Sock) => {
   const asyncWrapper =

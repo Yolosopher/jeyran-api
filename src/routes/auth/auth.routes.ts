@@ -2,7 +2,6 @@ import { Response, Router } from "express";
 import expressAsyncHandler from "express-async-handler";
 import z from "zod";
 import authService from "./auth.service";
-import { BadRequestError } from "../../errors/bad-request-error";
 import { validateZod } from "../../utils";
 import {
   ACCESS_TOKEN_EXPIRATION_TIME_MS,
