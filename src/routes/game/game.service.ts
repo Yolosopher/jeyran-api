@@ -608,6 +608,13 @@ class GameService {
       await game.updateOne({
         $push: { historyRounds: payload },
         $set: {
+          players: game.players.map((player) => {
+            const isWinner = payload.winners.includes(player.player.id);
+            return {
+              player: player.player.id,
+              score: isWinner ? player.score + 1 : player.score,
+            };
+          }),
           currentRound: game.currentRound.map(({ player }) => ({
             player: player.id,
             move: "none",
