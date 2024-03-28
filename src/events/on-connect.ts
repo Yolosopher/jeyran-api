@@ -41,7 +41,7 @@ const listenToAllOtherEvents = (socket: Sock) => {
         }
         await fn(socket, data);
 
-        if (callback) callback({ success: true });
+        if (typeof callback === "function") callback({ success: true });
       } catch (error: any) {
         console.log("caught error", error.message);
         let response: any = { success: false };
@@ -50,7 +50,7 @@ const listenToAllOtherEvents = (socket: Sock) => {
         } else {
           response.message = error.message;
         }
-        if (callback) {
+        if (typeof callback === "function") {
           callback(response);
         } else {
           socket.emit("error", response);

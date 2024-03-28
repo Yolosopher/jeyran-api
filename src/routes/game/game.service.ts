@@ -12,16 +12,15 @@ import {
   IGamePopulated,
   MoveType,
   ParseGameInfoForPlayerType,
-  RoundType,
 } from "./types.dto";
 
-type HistoryRoundPayloadType = {
+interface IHistoryRoundPayload {
   winners: string[];
   playerMoves: {
     player: string;
     move: MoveType;
   }[];
-};
+}
 
 class GameService {
   constructor(private gameModel: GameModel) {}
@@ -536,7 +535,7 @@ class GameService {
   }
   public async calculateScores(
     game: IGamePopulated
-  ): Promise<IGamePopulated | null> {
+  ): Promise<{ game: IGamePopulated; result: IHistoryRoundPayload } | null> {
     // check if round is finished
     if (!game.revealed) {
       return null;
@@ -546,16 +545,18 @@ class GameService {
     const movesPlayed = new Set(game.currentRound.map((player) => player.move));
 
     // check if tie
-    if (movesPlayed.size === 3) {
+    let payload: null | IHistoryRoundPayload = null;
+    if (movesPlayed.size !== 2) {
+      payload = {
+        winners: [],
+        playerMoves: game.currentRound.map(({ player, move }) => ({
+          player: player.id,
+          move: move as MoveType,
+        })),
+      };
       await game.updateOne({
         $push: {
-          historyRounds: {
-            winners: [],
-            playerMoves: game.currentRound.map(({ player, move }) => ({
-              player: player.id,
-              move,
-            })),
-          },
+          historyRounds: payload,
         },
         $set: {
           currentRound: game.currentRound.map(({ player, move }) => ({
@@ -565,7 +566,7 @@ class GameService {
         },
       });
     } else {
-      const payload: HistoryRoundPayloadType = {
+      payload = {
         winners: [],
         playerMoves: game.currentRound.map(({ player, move }) => ({
           player: player.id,
@@ -602,6 +603,11 @@ class GameService {
             payload.winners.push(player.player.id);
           }
         }
+      } else {
+        // no winners
+        throw new Error(
+          "No winning/losing condition found, this should not happen"
+        );
       }
 
       // update history rounds
@@ -609,7 +615,7 @@ class GameService {
         $push: { historyRounds: payload },
         $set: {
           players: game.players.map((player) => {
-            const isWinner = payload.winners.includes(player.player.id);
+            const isWinner = payload!.winners.includes(player.player.id);
             return {
               player: player.player.id,
               score: isWinner ? player.score + 1 : player.score,
@@ -623,7 +629,10 @@ class GameService {
       });
     }
 
-    return (await this.getGameById(game.gameId))!;
+    return {
+      game: (await this.getGameById(game.gameId))!,
+      result: payload,
+    };
   }
   // online players info
   private getOnlinePlayersKey(gameId: string): string {
@@ -700,6 +709,27 @@ class GameService {
     info: string[]
   ): Promise<void> {
     socketioServer.to(socketId).emit("game-online-players", info);
+  }
+
+  // send round result to players
+  public async sendRoundResultToPlayers(
+    game: IGamePopulated,
+    roundInfoToSend: IHistoryRoundPayload
+  ): Promise<void> {
+    const players = game.players.map((player) => player.player.id as string);
+    for (const playerId of players) {
+      const currentGame = await this.getCurrentGameOfTheUser(playerId);
+      if (currentGame === game.gameId) {
+        // get user sessions
+        const sessions = await sessionService.getUserSessions(playerId);
+        if (sessions) {
+          for (const sessionId of sessions) {
+            // send game info to player
+            socketioServer.to(sessionId).emit("round-info", roundInfoToSend);
+          }
+        }
+      }
+    }
   }
 }
 

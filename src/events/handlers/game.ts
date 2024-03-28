@@ -45,8 +45,16 @@ export const onGameMove = async (socket: SockVerified, move: MoveType) => {
   await gameService.sendGameInfoToCurrentPlayers(game);
 
   // start new after some time if all players have moved
-  const updatedGame = await gameService.calculateScores(game);
-  if (updatedGame) {
+  const updatedGameResult = await gameService.calculateScores(game);
+
+  if (updatedGameResult) {
+    const updatedGame = updatedGameResult.game;
+    const roundResult = updatedGameResult.result;
+
+    // send game result to all players
+    await gameService.sendRoundResultToPlayers(updatedGame, roundResult);
+
+    // start new round after some time
     setTimeout(async () => {
       await gameService.sendGameInfoToCurrentPlayers(updatedGame);
     }, TIME_TO_START_NEW_ROUND_IN_MS);
