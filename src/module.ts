@@ -20,7 +20,7 @@ export class AppModule {
     public certOptions: { key: string; cert: string } | undefined
   ) {
     this.httpServer = null;
-    this.port = process.env.PORT ? Number(process.env.PORT) : 6060;
+    this.port = process.env.PORT ? Number(process.env.PORT) : 7171;
     this.domain = "https://jeyran-api.yolosopher.online";
     this.hostname = `https://localhost:${this.port}`;
 
