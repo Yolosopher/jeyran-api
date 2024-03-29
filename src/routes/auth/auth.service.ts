@@ -3,6 +3,7 @@ import { NotAuthorizedError } from "../../errors/not-authorized-error";
 import authenticationService, {
   AuthenticationService,
 } from "../../services/authentication.service";
+import avatarService from "../../services/avatar.service";
 import User from "./auth.model";
 import { IUser, UserModel } from "./types.dto";
 
@@ -27,6 +28,8 @@ class AuthService {
     }
 
     const user = await this.userModel.create({ username, password });
+
+    await avatarService.createAvatar(username);
 
     return this.parseForClient(user);
   }

@@ -39,6 +39,7 @@ export const ACCESS_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
 export const REFRESH_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
   REFRESH_TOKEN_EXPIRATION_TIME
 );
+export const AVATARS_URL = "https://avatars.yolosopher.online";
 
 export const CORS_ORIGINS = [
   "http://localhost:3000",
