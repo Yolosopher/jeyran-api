@@ -42,16 +42,10 @@ export const REFRESH_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
 export const AVATARS_URL = "https://avatars.yolosopher.online";
 
 export const CORS_ORIGINS = [
-  "http://localhost:3000",
-  "http://localhost:6060",
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
   "http://localhost:5173",
   "https://localhost:5173",
   "http://127.0.0.1:5173",
   "https://127.0.0.1:5173",
-  "https://yolosopher.online",
-  "https://api.yolosopher.online",
   "https://192.168.100.2:5173",
   "http://192.168.100.2:5173",
 ];

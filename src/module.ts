@@ -1,5 +1,3 @@
-import { config } from "dotenv";
-config();
 import { Application, json, urlencoded } from "express";
 
 import cookieParser from "cookie-parser";
@@ -23,8 +21,8 @@ export class AppModule {
   ) {
     this.httpServer = null;
     this.port = process.env.PORT ? Number(process.env.PORT) : 6060;
-    this.domain = "https://yolosopher.online";
-    this.hostname = `http://localhost:${this.port}`;
+    this.domain = "https://jeyran-api.yolosopher.online";
+    this.hostname = `https://localhost:${this.port}`;
 
     this.isProd = false;
     this.app.set("trust proxy", true);
@@ -97,10 +95,6 @@ export class AppModule {
       },
     });
     this.httpServer.listen(this.port, () => {
-      // initialize socket.io
-
-      // roomService.init();
-
       console.log(
         `Listening on port http${this.certOptions ? "s" : ""}://localhost:${
           this.port

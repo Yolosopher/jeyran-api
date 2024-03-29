@@ -1,6 +1,4 @@
-import { Server, Socket } from "socket.io";
-import { currentUserForSocket } from "./middleware/current-user";
-import { requireAuthForSocket } from "./middleware/require-auth";
+import { Server } from "socket.io";
 import { onConnect } from "./events/on-connect";
 import { CORS_ORIGINS } from "./constants";
 
