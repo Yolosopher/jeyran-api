@@ -7,15 +7,20 @@ import path from "path";
 
 const bootstrap = () => {
   const isProd = process.env.NODE_ENV === "production";
-  const key = readFileSync(path.resolve("./certs/key.pem")) as any;
-  const cert = readFileSync(path.resolve("./certs/cert.pem")) as any;
+  let key: any, cert: any;
+
+  try {
+    key = readFileSync(path.resolve("./certs/key.pem")) as any;
+    cert = readFileSync(path.resolve("./certs/cert.pem")) as any;
+  } catch (error) {
+    // console.log(error);
+  }
 
   if (key && cert && !isProd) {
-    const app = new AppModule(express(), { key, cert });
-    app.start();
+    new AppModule(express(), { key, cert }).start();
   } else {
-    const app = new AppModule(express(), undefined);
-    app.start();
+    console.log("No key/cert found, starting in development mode");
+    new AppModule(express()).start();
   }
 };
 

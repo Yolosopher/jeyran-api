@@ -6,7 +6,8 @@ import routes from "./routes";
 import { connect } from "mongoose";
 import { errorHandler, invalidRouteHandler } from "./middleware";
 import redis from "./redis";
-import { createServer } from "https";
+import { createServer } from "http";
+import { createServer as createServerS } from "https";
 import socketioServer from "./socketio";
 import { CORS_ORIGINS } from "./constants";
 export class AppModule {
@@ -17,8 +18,11 @@ export class AppModule {
   public httpServer: T_HTTP_SERVER | null;
   constructor(
     public app: Application,
-    public certOptions: { key: string; cert: string } | undefined
+    public certOption?: { key: string; cert: string } | null
   ) {
+    if (this.certOption) {
+      this.certOption = null;
+    }
     this.httpServer = null;
     this.port = process.env.PORT ? Number(process.env.PORT) : 7171;
     this.domain = "https://jeyran-api.yolosopher.online";
@@ -83,20 +87,20 @@ export class AppModule {
       console.log(error);
     }
 
-    if (!this.certOptions) {
+    if (!this.certOption) {
       this.httpServer = createServer(this.app);
     } else {
-      this.httpServer = createServer(this.certOptions, this.app);
+      this.httpServer = createServerS(this.certOption, this.app);
     }
-    socketioServer.listen(this.httpServer!, {
-      cors: {
-        origin: CORS_ORIGINS,
-        credentials: true,
-      },
-    });
     this.httpServer.listen(this.port, () => {
+      socketioServer.listen(this.httpServer!, {
+        cors: {
+          origin: CORS_ORIGINS,
+          credentials: true,
+        },
+      });
       console.log(
-        `Listening on port http${this.certOptions ? "s" : ""}://localhost:${
+        `Listening on port http${this.certOption ? "s" : ""}://localhost:${
           this.port
         }`
       );
