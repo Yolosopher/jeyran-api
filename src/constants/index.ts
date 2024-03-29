@@ -52,4 +52,6 @@ export const CORS_ORIGINS = [
   "https://127.0.0.1:5173",
   "https://yolosopher.online",
   "https://api.yolosopher.online",
+  "https://192.168.100.2:5173",
+  "http://192.168.100.2:5173",
 ];

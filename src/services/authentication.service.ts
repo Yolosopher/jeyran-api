@@ -102,7 +102,11 @@ export class AuthenticationService {
   }
 
   public async blacklistRefreshToken(token: string) {
-    await this.redisClient.del(token);
+    try {
+      await this.redisClient.del(token);
+    } catch (error) {
+      // do nothing
+    }
   }
 
   public hashPassword(password: string) {
