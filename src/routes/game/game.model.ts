@@ -138,9 +138,7 @@ GameSchema.pre("save", function (done) {
 GameSchema.pre("updateOne", { document: false, query: true }, function (done) {
   const players = this.get("currentRound");
   if (!players) return done();
-  console.log("currentRound: ", players);
   if (players.length > 1) {
-    console.log("currentRound is modified...");
     // check if all players have made a move
     let allPlayersMadeMove = true;
     for (const player of players) {

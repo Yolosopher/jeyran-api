@@ -212,13 +212,8 @@ class GameService {
         : socketOrUserId.currentUser.id;
 
     // console.log(socketOrUserId)
-    console.log("userId", userId);
-    console.log(
-      "found",
-      game.currentRound.find((player) => player.player.id === userId)?.player.id
-    );
+
     game = game.toJSON();
-    console.log("player", game.currentRound[0]);
     game.currentRound = game.currentRound.map(({ move, player }) => {
       if (player.id === userId || move === "none") {
         return {

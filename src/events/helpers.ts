@@ -5,6 +5,6 @@ export const logSessionInfo = async () => {
   const sessionIds = sessions.map((a) => a.id);
 
   const sessionInfo = { quantity: sessionIds.length, sessionIds };
-  console.log(sessionInfo);
+
   return sessionInfo;
 };

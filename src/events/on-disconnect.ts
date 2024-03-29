@@ -11,7 +11,7 @@ export const onDisconnect = async (socket: Sock) => {
   if (!result.success) {
     // console.log("Failed to pop session, maybe not logged in socket");
   } else {
-    console.log(socket.id + " disconnected from redis");
+    // console.log(socket.id + " disconnected from redis");
     const gameId = await gameService.getCurrentGameOfTheUser(result.userId);
     if (gameId) {
       await gameService.removeOnlinePlayerFromGame(gameId, result.userId);
@@ -20,5 +20,5 @@ export const onDisconnect = async (socket: Sock) => {
     // await gameService.leaveGame(result.userId, true);
   }
 
-  console.log((await socketioServer.fetchSockets()).map((a) => a.id));
+  // console.log((await socketioServer.fetchSockets()).map((a) => a.id));
 };

@@ -95,9 +95,6 @@ export const currentUser = async (
   const accessTokenO = req?.cookies?.accessToken;
   const refreshTokenO = req?.cookies?.refreshToken;
 
-  console.log(req.cookies);
-  console.log("accessTokenO: ", accessTokenO);
-  console.log("refreshTokenO: ", refreshTokenO);
   const result = await handleTokensVerification({
     accessToken: accessTokenO,
     refreshToken: refreshTokenO,
@@ -112,8 +109,6 @@ export const currentUser = async (
     refreshToken,
     newTokens,
   } = result;
-  console.log("success: ", success);
-  console.log("result after success=true", result);
   if (success && !auth) {
     return next();
   }
@@ -128,9 +123,7 @@ export const currentUser = async (
   }
 
   if (currentUser) {
-    console.log("currentUser exists");
     if (newTokens) {
-      console.log("newTokens exists");
       // set cookies
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
@@ -207,7 +200,7 @@ export const analyzeCurrentUser = async (
     if (!result) {
       throw new Error("Failed to add session");
     } else {
-      console.log(socket.id + " connected");
+      // console.log(socket.id + " connected");
     }
   }
 };

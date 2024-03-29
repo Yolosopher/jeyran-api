@@ -73,7 +73,6 @@ const listenToAllOtherEvents = (socket: Sock) => {
 };
 
 export const onConnect = async (socketioServer: Server, socket: Sock) => {
-  console.log("running onConnect....");
-  console.log((await socketioServer.fetchSockets()).map((a) => a.id));
+  // console.log((await socketioServer.fetchSockets()).map((a) => a.id));
   listenToAllOtherEvents(socket);
 };
