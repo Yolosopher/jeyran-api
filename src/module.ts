@@ -10,6 +10,7 @@ import { createServer } from "http";
 import { createServer as createServerS } from "https";
 import socketioServer from "./socketio";
 import { CORS_ORIGINS } from "./constants";
+import sessionService from "./services/session.service";
 export class AppModule {
   public hostname: string;
   public domain: string;
@@ -20,7 +21,7 @@ export class AppModule {
     public app: Application,
     public certOption?: { key: string; cert: string } | null
   ) {
-    if (this.certOption) {
+    if (!this.certOption) {
       this.certOption = null;
     }
     this.httpServer = null;
@@ -83,6 +84,9 @@ export class AppModule {
       console.log("Redis connection");
       redis.on("error", (err) => console.log("Redis Client Error", err));
       await redis.connect();
+
+      // log every redis-cached sessions out when restarting/starting server
+      await sessionService.logEveryoneOut();
     } catch (error) {
       console.log(error);
     }
@@ -99,6 +103,7 @@ export class AppModule {
           credentials: true,
         },
       });
+
       console.log(
         `Listening on port http${this.certOption ? "s" : ""}://localhost:${
           this.port
