@@ -9,6 +9,9 @@ import {
   onPing,
   onGameRestart,
   onGameMove,
+  onKickPlayer,
+  onBanPlayer,
+  onUnBanPlayer,
 } from "./handlers/game";
 import { analyzeCurrentUser, useSocketAuth } from "../middleware/current-user";
 import { NotAuthorizedError } from "../errors/not-authorized-error";
@@ -58,13 +61,14 @@ const listenToAllOtherEvents = (socket: Sock) => {
       }
     };
 
-  // analyzeCurrentUser(socket);
-  // useSocketAuth(socket);
   socket.on("disconnect", asyncWrapper(onDisconnect, false));
   socket.on("ping", asyncWrapper(onPing));
   socket.on("game-create", asyncWrapper(onGameCreate));
   socket.on("game-join", asyncWrapper(onGameJoin));
   socket.on("game-leave", asyncWrapper(onGameLeave));
+  socket.on("game-kick", asyncWrapper(onKickPlayer));
+  socket.on("game-ban", asyncWrapper(onBanPlayer));
+  socket.on("game-unban", asyncWrapper(onUnBanPlayer));
   socket.on("game-start", asyncWrapper(onGameStart));
   socket.on("game-restart", asyncWrapper(onGameRestart));
   socket.on("game-stop", asyncWrapper(onGameStop));

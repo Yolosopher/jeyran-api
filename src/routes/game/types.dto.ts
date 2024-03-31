@@ -55,6 +55,7 @@ export interface IGame extends Document {
   currentRound: CurrentRoundType[];
   historyRounds: RoundType[];
   inGamePlayers: tID[];
+  blacklist: tID[] | IUser[];
   revealed: boolean;
 }
 
@@ -71,6 +72,7 @@ export interface IGamePopulated extends Document {
   currentRound: CurrentRoundPopulatedType[];
   historyRounds: RoundPopulatedType[];
   inGamePlayers: string[];
+  blacklist: UserPopulatedType[];
   revealed: boolean;
 }
 

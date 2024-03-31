@@ -104,6 +104,12 @@ const GameSchema = new Schema<IGame>(
       ref: "User",
       default: [],
     },
+    blacklist: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   {
     timestamps: true,
@@ -162,6 +168,7 @@ GameSchema.pre("findOne", { document: true, query: true }, function (done) {
   this.populate("currentRound.player", "id username");
   this.populate("historyRounds.winners", "id username");
   this.populate("historyRounds.playerMoves.player", "id username");
+  this.populate("blacklist", "id username");
   done();
 });
 

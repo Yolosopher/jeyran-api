@@ -20,6 +20,39 @@ export const onGameLeave = async (socket: SockVerified) => {
   await gameService.sendGameInfoToCurrentPlayers(game);
 };
 
+export const onKickPlayer = async (
+  socket: SockVerified,
+  userIdToKick: string
+) => {
+  const game = await gameService.kickPlayer({
+    socket,
+    userIdToKick,
+  });
+  await gameService.sendGameInfoToCurrentPlayers(game);
+};
+
+export const onUnBanPlayer = async (
+  socket: SockVerified,
+  userIdToUnban: string
+) => {
+  const game = await gameService.unBanPlayer({
+    socket,
+    userIdToUnban,
+  });
+  await gameService.sendGameInfoToCurrentPlayers(game);
+};
+
+export const onBanPlayer = async (
+  socket: SockVerified,
+  userIdToBan: string
+) => {
+  const game = await gameService.banPlayer({
+    socket,
+    userIdToBan,
+  });
+  await gameService.sendGameInfoToCurrentPlayers(game);
+};
+
 export const onGameStart = async (socket: SockVerified) => {
   const game = await gameService.startGame(socket);
   await gameService.sendGameInfoToCurrentPlayers(game);

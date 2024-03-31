@@ -105,13 +105,18 @@ class GameService {
       (player) => player.player.id === userId
     );
 
+    // check if player is banned
+    if (game.blacklist.find((banned) => banned.id === userId)) {
+      throw new NotAuthorizedError("reason:ban");
+    }
+
     if (!playerExists && game.state !== GameState.FINISHED) {
       await game.updateOne({
         $push: { players: { player: userId } },
         $addToSet: { inGamePlayers: userId }, // add user to online players
       });
     } else {
-      // add user to online players
+      // add user to inGamePlayers players
       await game.updateOne({
         $addToSet: { inGamePlayers: userId },
       });
@@ -153,12 +158,81 @@ class GameService {
 
     await this.delCurrentGameOfUser(userId);
 
-    // add user to inGame players
+    // remove user from inGame players
     await game.updateOne({
       $pull: { inGamePlayers: userId },
     });
 
     return (await this.getGameById(currentGameId))!;
+  }
+
+  public async kickPlayer({
+    socket,
+    userIdToKick,
+  }: {
+    socket: SockVerified;
+    userIdToKick: string;
+  }): Promise<IGamePopulated> {
+    // check if user is the creator and game exists
+    const { game } = await this.validateCreatorAndGame(socket);
+
+    await this.leaveGame(userIdToKick);
+
+    this.sendGameInfoToSocket(socket, null);
+    return (await this.getGameById(game.gameId))!;
+  }
+
+  public async banPlayer({
+    socket,
+    userIdToBan,
+  }: {
+    socket: SockVerified;
+    userIdToBan: string;
+  }): Promise<IGamePopulated> {
+    const { game, userId } = await this.validateCreatorAndGame(socket);
+
+    // check if userIdToban and creator are the same
+    if (userIdToBan === userId) {
+      throw new BadRequestError("You cannot ban yourself");
+    }
+
+    // ban player
+    await game.updateOne({
+      $push: { blacklist: userIdToBan },
+    });
+
+    try {
+      await this.sendBanMessageToUser(userIdToBan, game.gameId);
+      await this.kickPlayer({ socket, userIdToKick: userIdToBan });
+    } catch (error) {
+    } finally {
+      return (await this.getGameById(game.gameId))!;
+    }
+  }
+
+  public async unBanPlayer({
+    socket,
+    userIdToUnban,
+  }: {
+    socket: SockVerified;
+    userIdToUnban: string;
+  }): Promise<IGamePopulated> {
+    const { game, userId } = await this.validateCreatorAndGame(socket);
+
+    // check if user is banned
+    const isBanned = game.blacklist.find(
+      (banned) => banned.id === userIdToUnban
+    );
+    if (!isBanned) {
+      throw new BadRequestError("User is not banned");
+    }
+
+    // unban player
+    await game.updateOne({
+      $pull: { blacklist: userIdToUnban },
+    });
+
+    return (await this.getGameById(game.gameId))!;
   }
 
   public async getGameById(gameId: string): Promise<IGamePopulated | null> {
@@ -302,6 +376,21 @@ class GameService {
       for (const sessionId of sessions) {
         // send game info to player
         socketioServer.to(sessionId).emit("current-game", currentGameId);
+      }
+    }
+
+    return true;
+  }
+  private async sendBanMessageToUser(
+    userId: string,
+    gameId: string
+  ): Promise<true> {
+    // get user sessions
+    const sessions = await sessionService.getUserSessions(userId);
+    if (sessions) {
+      for (const sessionId of sessions) {
+        // send game info to player
+        socketioServer.to(sessionId).emit("get-banned", gameId);
       }
     }
 
@@ -629,6 +718,7 @@ class GameService {
       result: payload,
     };
   }
+
   // online players info
   private getOnlinePlayersKey(gameId: string): string {
     return `${gameId}:onlinePlayers`;
