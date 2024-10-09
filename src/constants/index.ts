@@ -39,7 +39,7 @@ export const ACCESS_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
 export const REFRESH_TOKEN_EXPIRATION_TIME_MS = parseTimeSpanToMilliseconds(
   REFRESH_TOKEN_EXPIRATION_TIME
 );
-export const AVATARS_URL = "https://avatars.yolosopher.online";
+export const AVATARS_URL = "https://avatars.yolosopher.site";
 
 export const CORS_ORIGINS = [
   "http://localhost:3000",
@@ -54,5 +54,5 @@ export const CORS_ORIGINS = [
   "https://127.0.0.1:5173",
   "https://192.168.100.2:5173",
   "http://192.168.100.2:5173",
-  "https://jeyran.yolosopher.online",
+  "https://jeyran.yolosopher.site",
 ];

@@ -26,7 +26,7 @@ export class AppModule {
     }
     this.httpServer = null;
     this.port = process.env.PORT ? Number(process.env.PORT) : 7171;
-    this.domain = "https://jeyran-api.yolosopher.online";
+    this.domain = "https://jeyran-api.yolosopher.site";
     this.hostname = `https://localhost:${this.port}`;
 
     this.isProd = false;
